@@ -52,7 +52,13 @@ def create_app() -> FastAPI:
                 "Content-Security-Policy": "default-src 'self'; img-src 'self' blob:; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
                 "X-Content-Type-Options": "nosniff",
                 "Referrer-Policy": "no-referrer",
-                "Cache-Control": "no-store",
+                "Cache-Control": "no-store"
+                if request.url.path.startswith("/api/")
+                else "public, max-age=300",
+                "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+                "Cross-Origin-Embedder-Policy": "require-corp",
+                "Cross-Origin-Opener-Policy": "same-origin",
+                "Cross-Origin-Resource-Policy": "same-origin",
                 "X-Frame-Options": "DENY",
             }
         )

@@ -175,6 +175,9 @@ def test_http_safety(client, monkeypatch):
     response = client.get("/")
     assert "frame-ancestors 'none'" in response.headers["content-security-policy"]
     assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["cross-origin-embedder-policy"] == "require-corp"
+    assert response.headers["cache-control"] == "public, max-age=300"
+    assert client.get("/api/health").headers["cache-control"] == "no-store"
 
 
 def test_layers_do_not_import_outer_layers():
