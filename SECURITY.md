@@ -10,7 +10,7 @@ Restrisiken: native Bilddecoder/GPU-Binary, Ressourcenverbrauch bis zu mehreren 
 
 - Semgrep: `p/python`, `p/security-audit` und eigene `.semgrep.yml` (Shell-Verbot). SAST ist kein Vollständigkeitsbeweis.
 - `pip-audit` gegen Runtime-Lock; GitHub Dependabot wöchentlich.
-- ZAP passive Baseline gegen ausschließlich lokalen Wegwerfserver in CI. Kein aktiver Pentest, keine authentifizierte Coverage. HTML-Report als Artefakt; Warnungen benötigen explizite Bearbeitung.
+- ZAP passive Baseline gegen ausschließlich lokalen Wegwerfserver in CI. Kein aktiver Pentest, keine authentifizierte Coverage. HTML-Report als Artefakt; Warnungen benötigen explizite Bearbeitung. `security/zap-baseline.conf` führt ausschließlich den Cache-Inventarhinweis 10049 als INFO weiter: Diese von ZAP als Informational bewertete Regel meldet sowohl no-store als auch cachebare Inhalte. Der Befund bleibt im Report sichtbar; API-/Download-no-store wird unabhängig getestet. Alle anderen und neue Regeln bleiben blockierend. Siehe [ZAP 10049](https://www.zaproxy.org/docs/alerts/10049/) und [Baseline-Konfiguration](https://www.zaproxy.org/docs/docker/baseline-scan/).
 - API-Tests für Fremd-Origin, DNS-Rebinding, falschen Inhalt, Größenlimits, Timeout-Fehler und sensible Metadaten.
 
 Schwachstellen bitte nicht mit privaten Fotos/Secrets in öffentliche Issues einstellen. Nutze GitHub Private Vulnerability Reporting, sofern vom Repository-Betreiber aktiviert, sonst vor Veröffentlichung einen privaten Kontaktweg vereinbaren.
