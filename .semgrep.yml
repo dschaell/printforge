@@ -1,0 +1,13 @@
+rules:
+  - id: no-shell-execution
+    languages: [python]
+    severity: ERROR
+    message: Use a fixed executable and an argument list; never shell=True.
+    pattern: subprocess.$FUNC(..., shell=True, ...)
+  - id: no-python-eval
+    languages: [python]
+    severity: ERROR
+    message: Never evaluate untrusted code.
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: exec(...)
