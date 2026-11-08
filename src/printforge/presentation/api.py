@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.background import BackgroundTask
 from starlette.concurrency import run_in_threadpool
+from starlette.middleware.base import RequestResponseEndpoint
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from printforge.application.service import analyze, render
@@ -38,17 +39,14 @@ def create_app() -> FastAPI:
     images = PillowImages()
 
     @app.middleware("http")
-    async def security(request: Request, call_next: object) -> Response:
-        from typing import cast
-
-        from starlette.middleware.base import RequestResponseEndpoint
+    async def security(request: Request, call_next: RequestResponseEndpoint) -> Response:
 
         origin = request.headers.get("origin")
         if request.method == "POST" and origin:
             parsed = urlsplit(origin)
             if parsed.netloc != request.headers.get("host") or parsed.scheme != request.url.scheme:
                 return JSONResponse({"detail": "Fremde Herkunft nicht erlaubt."}, status_code=403)
-        response = await cast(RequestResponseEndpoint, call_next)(request)
+        response = await call_next(request)
         response.headers.update(
             {
                 "Content-Security-Policy": "default-src 'self'; img-src 'self' blob:; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
