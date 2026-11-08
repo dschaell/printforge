@@ -52,8 +52,9 @@ jobs:
       - name: Passive ZAP baseline (warnings fail)
         run: |
           mkdir -p zap-report
+          cp security/zap-baseline.conf zap-report/
           chmod 777 zap-report
-          docker run --rm --network host -v "$PWD/zap-report:/zap/wrk:rw" ghcr.io/zaproxy/zaproxy@sha256:7aaa659b0d43078febd82e29bad112285c370727e86ab8340444220e17d9f0d2 zap-baseline.py -t http://127.0.0.1:8787 -r report.html -J report.json -m 1
+          docker run --rm --network host -v "$PWD/zap-report:/zap/wrk:rw" ghcr.io/zaproxy/zaproxy@sha256:7aaa659b0d43078febd82e29bad112285c370727e86ab8340444220e17d9f0d2 zap-baseline.py -t http://127.0.0.1:8787 -r report.html -J report.json -m 1 -c zap-baseline.conf
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:

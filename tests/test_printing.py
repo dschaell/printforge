@@ -85,6 +85,7 @@ def test_export_pixels_ppi_color_and_privacy(client, fmt):
         headers={"content-type": "application/octet-stream"},
     )
     assert response.status_code == 200, response.text[:200] if response.status_code != 200 else ""
+    assert response.headers["cache-control"] == "no-store"
     with Image.open(io.BytesIO(response.content)) as image:
         assert image.size == (100, 100)
         assert image.info["dpi"][0] == pytest.approx(100, abs=0.1)
