@@ -209,6 +209,17 @@ def plan_print(width: int, height: int, spec: PrintSpec) -> Plan:
         warnings.append("Upscaling ergänzt geschätzte Details; echte Schärfe ist nicht garantiert.")
     if ppi < 150:
         warnings.append("Sehr wenig Originaldetails für dieses Druckmaß: Probedruck empfohlen.")
+    if 1 < scale <= 4 and width * height * 16 > MAX_PIXELS:
+        # The 4x intermediate image would exceed the budget although the final size is fine.
+        possible = int(spec.ppi / scale)
+        warning = (
+            f"Das 4×-Zwischenbild ({round(width * height * 16 / 1_000_000)} MP) überschreitet "
+            f"das Limit von {MAX_PIXELS // 1_000_000} MP."
+        )
+        if possible >= MIN_PPI:
+            suggested = possible
+            warning += f" Bis {possible} PPI braucht dieses Bild keine KI-Vergrößerung."
+        warnings.append(warning)
     if scale > 4:
         possible = int(spec.ppi * 4 / scale)
         warning = "Mehr als 4× nötig. Export wird blockiert statt mehrfach KI hochzuskalieren."

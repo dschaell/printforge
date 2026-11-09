@@ -619,3 +619,17 @@ def test_larger_input_passes_when_limit_is_raised(tmp_path, monkeypatch):
 def test_health_reports_input_limits(client):
     data = client.get("/api/health").json()
     assert data["max_input_megapixels"] >= 1 and data["max_upload_mb"] >= 1
+
+
+def test_blocked_intermediate_image_is_explained_with_a_way_out(monkeypatch):
+    # 5040x7128 on A2 at 600 PPI: 1.97x needed, but the 4x intermediate is 575 MP.
+    import printforge.domain.planning as planning
+
+    monkeypatch.setattr(planning, "MAX_PIXELS", 400_000_000)
+    plan = plan_print(5040, 7128, PrintSpec(42, 59.4, 600))
+    assert 1 < plan.required_scale <= 4
+    text = " ".join(plan.warnings)
+    assert "Zwischenbild" in text and "575 MP" in text and "400 MP" in text
+    assert plan.suggested_ppi is not None
+    fine = plan_print(5040, 7128, PrintSpec(42, 59.4, plan.suggested_ppi))
+    assert fine.ai_passes == 0  # no AI pass needed at the suggested PPI

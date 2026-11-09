@@ -257,10 +257,16 @@ $("settings").addEventListener("submit", async (event) => {
         (health?.upscayl_available &&
           plan.source_width * plan.source_height * 16 <=
             (health?.max_output_megapixels ?? 120) * 1000000));
+    const reason =
+      plan.required_scale > 4
+        ? "mehr als 4× Vergrößerung nötig"
+        : plan.ai_passes && !health?.upscayl_available
+          ? "Upscayl ist nicht verfügbar"
+          : "das 4×-Zwischenbild überschreitet das Pixellimit";
     status(
       allowed
         ? "Berechnung fertig. Druckdatei kann erstellt werden."
-        : "Export aktuell blockiert: Upscayl-Konfiguration oder Größenlimit prüfen.",
+        : `Export blockiert: ${reason}.`,
     );
     if (plan.suggested_ppi) suggest(plan.suggested_ppi);
     if ($("trim").checked && plan.fitted_paper_cm)
