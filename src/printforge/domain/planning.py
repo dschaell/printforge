@@ -120,6 +120,7 @@ class Plan:
     quality: Quality = "kritisch"
     quality_text: str = ""
     suggested_ppi: int | None = None
+    fitted_paper_cm: tuple[float, float] | None = None
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -141,6 +142,15 @@ def rate_quality(source_ppi: float) -> Quality:
     if source_ppi >= 100:
         return "grenzwertig"
     return "kritisch"
+
+
+def fit_paper(aspect: float, width_cm: float, height_cm: float) -> tuple[float, float] | None:
+    """Largest paper with the image aspect that fits inside the chosen size; None if equal."""
+    if abs(aspect / (width_cm / height_cm) - 1) <= 0.01:
+        return None
+    if aspect >= width_cm / height_cm:
+        return width_cm, round(width_cm / aspect, 1)
+    return round(height_cm * aspect, 1), height_cm
 
 
 def plan_print(width: int, height: int, spec: PrintSpec) -> Plan:
@@ -190,6 +200,7 @@ def plan_print(width: int, height: int, spec: PrintSpec) -> Plan:
         quality,
         QUALITY_TEXT[quality],
         suggested,
+        fit_paper(width / height, spec.width_cm, spec.height_cm),
     )
 
 

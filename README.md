@@ -26,6 +26,7 @@ Binary muss ausführbar sein. Modellname ohne `.bin`/`.param`. Auf Windows Power
 
 - JPEG/PNG/WebP/TIFF anhand tatsächlicher Datei dekodieren, EXIF-Ausrichtung berücksichtigen.
 - A6–A0, B1–B4, Poster-Standards (30×40 bis 70×100) oder freie Maße 1–200 cm, 72–600 PPI. Papier dreht sich automatisch passend zum Bild; ⇄ dreht zurück.
+- „Weiße Ränder entfernen“ schneidet fast-weiße Kanten vor dem Skalieren ab (Transparenz zählt als Weiß). Danach schlägt die Analyse das größte Papiermaß mit Bildseitenverhältnis innerhalb des gewählten Formats vor, ohne Zoom und ohne neue Ränder.
 - Optionaler Druckerei-Anschnitt 0–10 mm je Seite. „Fläche füllen“ läuft in den Anschnitt, „Ganzes Bild“ lässt ihn weiß.
 - Ganze Bilder mit weißen Rändern oder mittigem Zuschnitt; Vorschau im Browser (TIFF browserabhängig).
 - Original-PPI am gewählten Druckmaß, erforderlicher Faktor, abgeschnittener Bildanteil und eine Qualitätseinstufung (gut / ausreichend / grenzwertig / kritisch) anzeigen.

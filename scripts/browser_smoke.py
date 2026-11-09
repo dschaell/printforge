@@ -102,6 +102,23 @@ try:
         page.locator("#suggest").click()
         expect(page.locator("#metrics")).to_be_visible()
         expect(page.locator("#ppi")).to_have_value(suggested)
+        # White bars are trimmed and the paper fits the trimmed image.
+        bars = Path(directory) / "bars.png"
+        framed = Image.new("RGB", (800, 600), "white")
+        framed.paste(Image.new("RGB", (800, 400), "#537251"), (0, 100))
+        framed.save(bars)
+        page.locator("#file").set_input_files(str(bars))
+        page.locator("#preset").select_option("A4")
+        page.locator("#trim").check()
+        page.locator("#ppi").select_option("100")
+        page.locator("#analyze").click()
+        expect(page.locator("#fitpaper")).to_be_visible()
+        expect(page.locator("#metrics")).to_contain_text("Nach Weißrand-Zuschnitt")
+        expect(page.locator("#metrics")).to_contain_text("800 × 400 px")
+        page.locator("#fitpaper").click()
+        expect(page.locator("#fitpaper")).to_be_hidden()
+        if not 14.8 <= float(page.locator("#height").input_value()) <= 14.9:
+            raise RuntimeError("Paper was not fitted to the trimmed image")
         # Drag and drop loads the file like the picker does.
         page.locator("#drop").dispatch_event(
             "drop",

@@ -122,6 +122,13 @@
                   required
               /></label>
             </div>
+            <label class="check"
+              ><input id="trim" type="checkbox" /> Weiße Ränder entfernen
+              <small
+                >Schneidet weiße Kanten im Bild vor dem Skalieren ab, ohne ins
+                Motiv zu zoomen.</small
+              ></label
+            >
             <button class="secondary" id="analyze" type="submit">
               Druckfähigkeit analysieren ↗
             </button>
@@ -130,6 +137,7 @@
             Wähle ein Motiv, um loszulegen.
           </div>
           <button class="secondary" id="suggest" type="button" hidden></button>
+          <button class="secondary" id="fitpaper" type="button" hidden></button>
           <p id="quality" class="quality" hidden></p>
           <dl id="metrics" hidden></dl>
           <ul id="warnings"></ul>

@@ -246,7 +246,22 @@ ul {
 .quality[data-level="kritisch"] strong {
   background: #a3342b;
 }
+.check {
+  display: block;
+  font-size: 13px;
+  color: #202c29;
+}
+.check input {
+  margin-right: 6px;
+}
+.check small {
+  display: block;
+  margin-left: 22px;
+  font-size: 11px;
+  color: #6c7669;
+}
 #suggest,
+#fitpaper,
 #compare {
   margin-top: 16px;
   width: 100%;

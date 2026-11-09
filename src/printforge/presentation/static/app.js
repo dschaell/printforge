@@ -38,6 +38,14 @@ function clearCompare() {
 function hideSuggestion() {
   $("suggest").hidden = true;
   delete $("suggest").dataset.ppi;
+  $("fitpaper").hidden = true;
+}
+function suggestPaper([w, h]) {
+  $("fitpaper").dataset.w = w;
+  $("fitpaper").dataset.h = h;
+  $("fitpaper").textContent =
+    `Papier auf ${number.format(w)} × ${number.format(h)} cm anpassen (Bildformat)`;
+  $("fitpaper").hidden = false;
 }
 function suggest(ppi) {
   $("suggest").dataset.ppi = ppi;
@@ -64,6 +72,7 @@ function setBusy(value) {
   $("download").disabled = value || !plan;
   $("compare").disabled = value || !plan;
   $("suggest").disabled = value;
+  $("fitpaper").disabled = value;
   for (const el of document.querySelectorAll("input,select,#rotate"))
     el.disabled = value;
 }
@@ -144,7 +153,7 @@ $("preset").addEventListener("change", () => {
   }
   invalidate();
 });
-for (const id of ["width", "height", "ppi", "fit", "format", "bleed"])
+for (const id of ["width", "height", "ppi", "fit", "format", "bleed", "trim"])
   $(id).addEventListener("input", () => {
     if (["width", "height"].includes(id)) $("preset").value = "custom";
     invalidate();
@@ -162,6 +171,7 @@ async function request(action, extra = {}) {
     fit: $("fit").value,
     output_format: $("format").value,
     bleed_mm: $("bleed").value || "0",
+    trim_white: $("trim").checked ? "true" : "false",
     ...extra,
   });
   const response = await fetch(`/api/${action}?${params}`, {
@@ -184,16 +194,21 @@ async function request(action, extra = {}) {
   }
   return response;
 }
-function showMetrics() {
+function showMetrics(image) {
   const bleed = +$("bleed").value || 0;
   const metrics = [
-    ["Original", `${plan.source_width} × ${plan.source_height} px`],
+    ["Original", `${image.width} × ${image.height} px`],
     ["Druckdatei", `${plan.target_width} × ${plan.target_height} px`],
     ["Original am Druckmaß", `${plan.source_ppi} PPI`],
     ["Vergrößerung", `${plan.required_scale.toFixed(2)}×`],
     ["Bildanteil abgeschnitten", `${plan.crop_percent} %`],
     ["Zielauflösung", `${$("ppi").value} PPI`],
   ];
+  if (image.trim_box)
+    metrics.splice(1, 0, [
+      "Nach Weißrand-Zuschnitt",
+      `${plan.source_width} × ${plan.source_height} px`,
+    ]);
   if (bleed > 0)
     metrics.push([
       "Gesamtmaß inkl. Anschnitt",
@@ -235,7 +250,7 @@ $("settings").addEventListener("submit", async (event) => {
   try {
     const data = await (await request("plan")).json();
     plan = data.plan;
-    showMetrics();
+    showMetrics(data.image);
     const allowed =
       plan.required_scale <= 4 &&
       (!plan.ai_passes ||
@@ -247,6 +262,8 @@ $("settings").addEventListener("submit", async (event) => {
         : "Export aktuell blockiert: Upscayl-Konfiguration oder Größenlimit prüfen.",
     );
     if (plan.suggested_ppi) suggest(plan.suggested_ppi);
+    if ($("trim").checked && plan.fitted_paper_cm)
+      suggestPaper(plan.fitted_paper_cm);
     if (!allowed) plan = null;
   } catch (error) {
     status(error.message);
@@ -260,6 +277,16 @@ $("suggest").addEventListener("click", () => {
   const ppi = Number($("suggest").dataset.ppi);
   if (!ppi || busy) return;
   setPpi(ppi);
+  $("settings").requestSubmit();
+});
+
+$("fitpaper").addEventListener("click", () => {
+  if (busy) return;
+  [$("width").value, $("height").value] = [
+    $("fitpaper").dataset.w,
+    $("fitpaper").dataset.h,
+  ];
+  $("preset").value = "custom";
   $("settings").requestSubmit();
 });
 

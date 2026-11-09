@@ -93,6 +93,7 @@ def create_app() -> FastAPI:
         output_format: Literal["png", "jpeg", "tiff"] = "png",
         bleed_mm: Annotated[float, Query(ge=0, le=MAX_BLEED_MM)] = 0,
         method: Literal["plain", "ai"] = "plain",
+        trim_white: bool = False,
     ) -> Response:
         spec = PrintSpec(width_cm, height_cm, ppi, fit, bleed_mm)
         if request.headers.get("content-type", "").split(";")[0] != "application/octet-stream":
@@ -113,15 +114,29 @@ def create_app() -> FastAPI:
                             raise HTTPException(413, "Maximal 40 MiB pro Datei.")
                         stream.write(chunk)
                 if action == "plan":
-                    plan, info = await run_in_threadpool(analyze, source, spec, images)
+                    plan, info = await run_in_threadpool(analyze, source, spec, images, trim_white)
                     return JSONResponse({"plan": plan.to_dict(), "image": info})
                 if action == "sample":
                     output = await run_in_threadpool(
-                        sample, source, directory, spec, method, app.state.upscaler, images
+                        sample,
+                        source,
+                        directory,
+                        spec,
+                        method,
+                        app.state.upscaler,
+                        images,
+                        trim_white,
                     )
                 else:
                     output = await run_in_threadpool(
-                        render, source, directory, spec, output_format, app.state.upscaler, images
+                        render,
+                        source,
+                        directory,
+                        spec,
+                        output_format,
+                        app.state.upscaler,
+                        images,
+                        trim_white,
                     )
                 kind = "png" if action == "sample" else output_format
                 response = FileResponse(

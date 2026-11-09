@@ -447,3 +447,111 @@ def test_sample_endpoint_returns_cleaned_up_png(client, monkeypatch):
         ).status_code
         == 422
     )
+
+
+# --- White border trim (#19) ---
+
+
+def barred(size=(400, 300), bar=50, fmt="PNG", **kwargs):
+    """Red picture with white bars at top and bottom."""
+    image = Image.new("RGB", size, "white")
+    image.paste(Image.new("RGB", (size[0], size[1] - 2 * bar), "red"), (0, bar))
+    data = io.BytesIO()
+    image.save(data, format=fmt, **kwargs)
+    return data.getvalue()
+
+
+def test_content_box_finds_bars_and_tolerates_noise(tmp_path):
+    from printforge.infrastructure.images import content_box
+
+    source = tmp_path / "bars"
+    source.write_bytes(barred())
+    assert content_box(source) == (0, 50, 400, 250)
+    noisy = Image.open(io.BytesIO(barred())).convert("RGB")
+    noisy.putpixel((5, 5), (252, 253, 251))  # faint JPEG-like noise inside the white bar
+    data = io.BytesIO()
+    noisy.save(data, format="PNG")
+    source.write_bytes(data.getvalue())
+    assert content_box(source) == (0, 50, 400, 250)
+
+
+def test_content_box_treats_transparency_as_white_and_rejects_all_white(tmp_path):
+    from printforge.infrastructure.images import content_box
+
+    rgba = Image.new("RGBA", (100, 100), (0, 0, 0, 0))
+    rgba.paste(Image.new("RGBA", (20, 20), (255, 0, 0, 255)), (40, 30))
+    source = tmp_path / "t"
+    data = io.BytesIO()
+    rgba.save(data, format="PNG")
+    source.write_bytes(data.getvalue())
+    assert content_box(source) == (40, 30, 60, 50)
+    source.write_bytes(_white())
+    with pytest.raises(PrintError, match="nur aus Weiß"):
+        content_box(source)
+
+
+def _white():
+    data = io.BytesIO()
+    Image.new("RGB", (50, 50), "white").save(data, format="PNG")
+    return data.getvalue()
+
+
+def test_fit_paper_keeps_aspect_inside_chosen_format():
+    from printforge.domain.planning import fit_paper
+
+    assert fit_paper(1.0, 50, 70) == (50, 50.0)  # wider than paper: keep width
+    assert fit_paper(0.5, 50, 70) == (35.0, 70)  # narrower: keep height
+    assert fit_paper(50 / 70, 50, 70) is None  # same aspect: nothing to suggest
+    plan = plan_print(400, 200, PrintSpec(50, 70, 150))
+    assert plan.fitted_paper_cm == (50, 25.0)
+
+
+def test_plan_with_trim_uses_trimmed_size(client):
+    headers = {"content-type": "application/octet-stream"}
+    plain = client.post(
+        "/api/plan?width_cm=10&height_cm=10&ppi=100", content=barred(), headers=headers
+    )
+    trimmed = client.post(
+        "/api/plan?width_cm=10&height_cm=10&ppi=100&trim_white=true",
+        content=barred(),
+        headers=headers,
+    )
+    assert plain.json()["plan"]["source_height"] == 300
+    body = trimmed.json()
+    assert (body["plan"]["source_width"], body["plan"]["source_height"]) == (400, 200)
+    assert body["image"]["trim_box"] == [0, 50, 400, 250]
+    assert body["image"]["height"] == 300  # original size stays visible
+    assert body["plan"]["fitted_paper_cm"] == [10, 5.0]
+
+
+def test_render_with_trim_has_no_white_bars_on_fitted_paper(client):
+    response = client.post(
+        "/api/render?width_cm=4&height_cm=2&ppi=100&trim_white=true",
+        content=barred(),
+        headers={"content-type": "application/octet-stream"},
+    )
+    assert response.status_code == 200, response.text[:200]
+    with Image.open(io.BytesIO(response.content)) as image:
+        rgb = image.convert("RGB")
+        assert rgb.getpixel((rgb.width // 2, 0))[1] < 10  # red up to the very top
+        assert rgb.getpixel((rgb.width // 2, rgb.height - 1))[1] < 10
+    untrimmed = client.post(
+        "/api/render?width_cm=4&height_cm=2&ppi=100",
+        content=barred(),
+        headers={"content-type": "application/octet-stream"},
+    )
+    with Image.open(io.BytesIO(untrimmed.content)) as image:
+        assert image.convert("RGB").getpixel((image.width // 2, 0)) == (255, 255, 255)
+
+
+def test_sample_with_trim_stays_inside_content(tmp_path):
+    source = tmp_path / "bars"
+    source.write_bytes(barred())
+    out = sample(
+        source, tmp_path, PrintSpec(4, 2, 100), "plain", FakeUpscaler(), PillowImages(), True
+    )
+    with Image.open(out) as image:
+        rgb = image.convert("RGB")
+        assert all(
+            rgb.getpixel((x, y))[1] < 10 for x in (0, rgb.width - 1) for y in (0, rgb.height - 1)
+        )

@@ -14,11 +14,30 @@ from printforge.domain.planning import (
 
 
 def analyze(
-    source: Path, spec: PrintSpec, images: ImageProcessor
+    source: Path, spec: PrintSpec, images: ImageProcessor, trim_white: bool = False
 ) -> tuple[Plan, dict[str, object]]:
     info = images.inspect(source)
-    plan = plan_print(int(str(info["width"])), int(str(info["height"])), spec)
-    return plan, info
+    width, height = int(str(info["width"])), int(str(info["height"]))
+    if trim_white:
+        left, top, right, bottom = images.content_box(source)
+        info["trim_box"] = [left, top, right, bottom]
+        width, height = right - left, bottom - top
+    return plan_print(width, height, spec), info
+
+
+def _prepare(
+    source: Path, work: Path, spec: PrintSpec, images: ImageProcessor, trim_white: bool
+) -> tuple[Plan, Path]:
+    """Plan plus the normalized (and, if requested, white-trimmed) working image."""
+    plan, info = analyze(source, spec, images, trim_white)
+    normalized = work / "normalized.png"
+    images.normalize(source, normalized)
+    box = info.get("trim_box")
+    if box:
+        trimmed = work / "trimmed.png"
+        images.crop(normalized, trimmed, tuple(box))  # type: ignore[arg-type]
+        normalized = trimmed
+    return plan, normalized
 
 
 def _enlarge(source: Path, destination: Path, upscaler: Upscaler, images: ImageProcessor) -> None:
@@ -37,15 +56,14 @@ def sample(
     method: str,
     upscaler: Upscaler,
     images: ImageProcessor,
+    trim_white: bool = False,
 ) -> Path:
     """100 % detail crop of the print result: plain Lanczos or one Upscayl pass on the crop."""
     if method not in ("plain", "ai"):
         raise PrintError("Unbekannte Vergleichsmethode.")
-    plan, _ = analyze(source, spec, images)
+    plan, normalized = _prepare(source, work, spec, images, trim_white)
     if method == "ai" and plan.required_scale > 4:
         raise PrintError("Mehr als 4× Vergrößerung nötig. Druckmaß oder PPI reduzieren.")
-    normalized = work / "normalized.png"
-    images.normalize(source, normalized)
     box, size = sample_window(plan.source_width, plan.source_height, spec, plan.required_scale)
     cropped = work / "crop.png"
     images.crop(normalized, cropped, box)
@@ -65,12 +83,11 @@ def render(
     output_format: str,
     upscaler: Upscaler,
     images: ImageProcessor,
+    trim_white: bool = False,
 ) -> Path:
     if output_format not in ("png", "jpeg", "tiff"):
         raise PrintError("Unbekanntes Ausgabeformat.")
-    plan, _ = analyze(source, spec, images)
-    normalized = work / "normalized.png"
-    images.normalize(source, normalized)
+    plan, normalized = _prepare(source, work, spec, images, trim_white)
     if plan.required_scale > 4:
         raise PrintError("Mehr als 4× Vergrößerung nötig. Druckmaß oder PPI reduzieren.")
     if plan.ai_passes:
