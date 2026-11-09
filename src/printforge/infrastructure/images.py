@@ -4,13 +4,14 @@ from typing import Any
 
 from PIL import Image, ImageChops, ImageCms, ImageOps, UnidentifiedImageError
 
-from printforge.domain.planning import MAX_PIXELS, PrintError, PrintSpec
+from printforge.domain.planning import MAX_INPUT_PIXELS, MAX_PIXELS, PrintError, PrintSpec
 
 Image.MAX_IMAGE_PIXELS = MAX_PIXELS
 ALLOWED = {"JPEG", "PNG", "WEBP", "TIFF"}
 
 
-def inspect_image(path: Path, max_pixels: int = 30_000_000) -> dict[str, Any]:
+def inspect_image(path: Path, max_pixels: int | None = None) -> dict[str, Any]:
+    max_pixels = MAX_INPUT_PIXELS if max_pixels is None else max_pixels
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("error", Image.DecompressionBombWarning)

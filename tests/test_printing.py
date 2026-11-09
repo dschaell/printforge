@@ -23,9 +23,11 @@ def pinned_limit(monkeypatch):
     """Geometry tests assume 120 MP regardless of the configurable default."""
     import printforge.application.service as service
     import printforge.domain.planning as planning
+    import printforge.infrastructure.images as images
 
     for module in (planning, service):
         monkeypatch.setattr(module, "MAX_PIXELS", 120_000_000)
+    monkeypatch.setattr(images, "MAX_INPUT_PIXELS", 30_000_000)
 
 
 @pytest.fixture
@@ -590,3 +592,30 @@ def test_a0_at_300_ppi_works_with_a_raised_limit(monkeypatch):
 
 def test_health_reports_the_limit(client):
     assert client.get("/api/health").json()["max_output_megapixels"] >= 1
+
+
+def test_input_limits_are_configurable_with_safe_fallbacks():
+    from printforge.domain.planning import configured_max_input_pixels, configured_max_upload_bytes
+
+    assert configured_max_input_pixels("250") == 250_000_000
+    assert configured_max_input_pixels("0") == 100_000_000
+    assert configured_max_input_pixels("5000") == 100_000_000
+    assert configured_max_input_pixels("x") == 100_000_000
+    assert configured_max_upload_bytes("200") == 200 * 1024 * 1024
+    assert configured_max_upload_bytes("nan") == 100 * 1024 * 1024
+
+
+def test_larger_input_passes_when_limit_is_raised(tmp_path, monkeypatch):
+    import printforge.infrastructure.images as images
+
+    source = tmp_path / "big.png"
+    source.write_bytes(picture((6000, 5001)))
+    with pytest.raises(PrintError, match="30 Mega"):
+        inspect_image(source)
+    monkeypatch.setattr(images, "MAX_INPUT_PIXELS", 100_000_000)
+    assert inspect_image(source)["width"] == 6000
+
+
+def test_health_reports_input_limits(client):
+    data = client.get("/api/health").json()
+    assert data["max_input_megapixels"] >= 1 and data["max_upload_mb"] >= 1

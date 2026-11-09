@@ -9,21 +9,41 @@ Fit = Literal["contain", "cover"]
 Quality = Literal["gut", "ausreichend", "grenzwertig", "kritisch"]
 DEFAULT_MAX_MEGAPIXELS = 400
 ENV_MAX_MEGAPIXELS = "PRINTFORGE_MAX_MEGAPIXELS"
+DEFAULT_MAX_INPUT_MEGAPIXELS = 100
+ENV_MAX_INPUT_MEGAPIXELS = "PRINTFORGE_MAX_INPUT_MEGAPIXELS"
+DEFAULT_MAX_UPLOAD_MIB = 100
+ENV_MAX_UPLOAD_MIB = "PRINTFORGE_MAX_UPLOAD_MIB"
+
+
+def _configured(name: str, default: float, high: float, raw: str | None) -> float:
+    """Operator setting from the environment; invalid or implausible values use the default."""
+    text = os.environ.get(name) if raw is None else raw
+    try:
+        value = float(text) if text else default
+    except ValueError:
+        value = default
+    return value if isfinite(value) and 1 <= value <= high else default
 
 
 def configured_max_pixels(raw: str | None = None) -> int:
-    """Output pixel budget in pixels; invalid or implausible values fall back to the default."""
-    text = os.environ.get(ENV_MAX_MEGAPIXELS) if raw is None else raw
-    try:
-        megapixels = float(text) if text else DEFAULT_MAX_MEGAPIXELS
-    except ValueError:
-        megapixels = DEFAULT_MAX_MEGAPIXELS
-    if not isfinite(megapixels) or not 1 <= megapixels <= 2000:
-        megapixels = DEFAULT_MAX_MEGAPIXELS
-    return int(megapixels * 1_000_000)
+    """Output pixel budget in pixels."""
+    value = _configured(ENV_MAX_MEGAPIXELS, DEFAULT_MAX_MEGAPIXELS, 2000, raw)
+    return int(value * 1_000_000)
+
+
+def configured_max_input_pixels(raw: str | None = None) -> int:
+    value = _configured(ENV_MAX_INPUT_MEGAPIXELS, DEFAULT_MAX_INPUT_MEGAPIXELS, 1000, raw)
+    return int(value * 1_000_000)
+
+
+def configured_max_upload_bytes(raw: str | None = None) -> int:
+    value = _configured(ENV_MAX_UPLOAD_MIB, DEFAULT_MAX_UPLOAD_MIB, 1000, raw)
+    return int(value * 1024 * 1024)
 
 
 MAX_PIXELS = configured_max_pixels()
+MAX_INPUT_PIXELS = configured_max_input_pixels()
+MAX_UPLOAD_BYTES = configured_max_upload_bytes()
 MIN_PPI = 72
 MAX_PPI = 600
 MAX_BLEED_MM = 10.0

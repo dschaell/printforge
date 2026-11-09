@@ -15,11 +15,19 @@ from starlette.middleware.base import RequestResponseEndpoint
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from printforge.application.service import analyze, render, sample
-from printforge.domain.planning import MAX_BLEED_MM, MAX_PIXELS, PRESETS, PrintError, PrintSpec
+from printforge.domain.planning import (
+    MAX_BLEED_MM,
+    MAX_INPUT_PIXELS,
+    MAX_PIXELS,
+    MAX_UPLOAD_BYTES,
+    PRESETS,
+    PrintError,
+    PrintSpec,
+)
 from printforge.infrastructure.images import PillowImages
 from printforge.infrastructure.upscayl import Upscayl
 
-MAX_BYTES = 40 * 1024 * 1024
+MAX_BYTES = MAX_UPLOAD_BYTES
 STATIC = Path(__file__).parent / "static"
 
 
@@ -77,8 +85,8 @@ def create_app() -> FastAPI:
             "status": "ok",
             "upscayl_available": app.state.upscaler.available,
             "presets": PRESETS,
-            "max_upload_mb": 40,
-            "max_input_megapixels": 30,
+            "max_upload_mb": MAX_BYTES // (1024 * 1024),
+            "max_input_megapixels": MAX_INPUT_PIXELS // 1_000_000,
             "max_bleed_mm": MAX_BLEED_MM,
             "max_output_megapixels": MAX_PIXELS // 1_000_000,
         }
@@ -112,7 +120,9 @@ def create_app() -> FastAPI:
                     async for chunk in request.stream():
                         size += len(chunk)
                         if size > MAX_BYTES:
-                            raise HTTPException(413, "Maximal 40 MiB pro Datei.")
+                            raise HTTPException(
+                                413, f"Maximal {MAX_BYTES // (1024 * 1024)} MiB pro Datei."
+                            )
                         stream.write(chunk)
                 if action == "plan":
                     plan, info = await run_in_threadpool(analyze, source, spec, images, trim_white)

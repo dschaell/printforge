@@ -357,6 +357,8 @@ fetch("/api/health")
   .then((data) => {
     health = data;
     $("limit").textContent = data.max_output_megapixels;
+    $("max-upload").textContent = data.max_upload_mb;
+    $("max-input").textContent = data.max_input_megapixels;
     fillPresets(data.presets);
     $("engine").textContent = data.upscayl_available
       ? "● Upscayl verbunden"
