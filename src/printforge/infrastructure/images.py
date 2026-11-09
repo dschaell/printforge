@@ -74,9 +74,12 @@ def export_image(source: Path, destination: Path, spec: PrintSpec, fmt: str) -> 
     with Image.open(source) as image:
         size = (spec.width_px, spec.height_px)
         if spec.fit == "cover":
+            # The image fills the whole sheet including bleed.
             result = ImageOps.fit(image, size, method=Image.Resampling.LANCZOS)
         else:
-            fitted = ImageOps.contain(image, size, method=Image.Resampling.LANCZOS)
+            # The whole image sits in the trim box; the bleed stays white.
+            trim = (spec.trim_width_px, spec.trim_height_px)
+            fitted = ImageOps.contain(image, trim, method=Image.Resampling.LANCZOS)
             result = Image.new("RGB", size, "white")
             result.paste(fitted, ((size[0] - fitted.width) // 2, (size[1] - fitted.height) // 2))
         profile = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
@@ -88,7 +91,19 @@ def export_image(source: Path, destination: Path, spec: PrintSpec, fmt: str) -> 
         result.save(destination, format=fmt.upper(), **options)
 
 
+def crop_image(source: Path, destination: Path, box: tuple[int, int, int, int]) -> None:
+    with Image.open(source) as image:
+        image.crop(box).save(destination, format="PNG")
+
+
+def resize_image(source: Path, destination: Path, size: tuple[int, int]) -> None:
+    with Image.open(source) as image:
+        image.resize(size, Image.Resampling.LANCZOS).save(destination, format="PNG")
+
+
 class PillowImages:
     inspect = staticmethod(inspect_image)
     normalize = staticmethod(normalize_image)
     export = staticmethod(export_image)
+    crop = staticmethod(crop_image)
+    resize = staticmethod(resize_image)

@@ -25,9 +25,12 @@ Binary muss ausführbar sein. Modellname ohne `.bin`/`.param`. Auf Windows Power
 ## Was die erste Version kann
 
 - JPEG/PNG/WebP/TIFF anhand tatsächlicher Datei dekodieren, EXIF-Ausrichtung berücksichtigen.
-- A0–A5, Hoch-/Querformat oder freie Maße 1–200 cm, 72–600 PPI.
-- Ganze Bilder mit weißen Rändern oder mittiger Beschnitt; Vorschau im Browser (TIFF browserabhängig).
-- Original-PPI am gewählten Druckmaß, erforderlicher Faktor und Beschnittfläche anzeigen.
+- A6–A0, B1–B4, Poster-Standards (30×40 bis 70×100) oder freie Maße 1–200 cm, 72–600 PPI. Papier dreht sich automatisch passend zum Bild; ⇄ dreht zurück.
+- Optionaler Druckerei-Anschnitt 0–10 mm je Seite. „Fläche füllen“ läuft in den Anschnitt, „Ganzes Bild“ lässt ihn weiß.
+- Ganze Bilder mit weißen Rändern oder mittigem Zuschnitt; Vorschau im Browser (TIFF browserabhängig).
+- Original-PPI am gewählten Druckmaß, erforderlicher Faktor, abgeschnittener Bildanteil und eine Qualitätseinstufung (gut / ausreichend / grenzwertig / kritisch) anzeigen.
+- Bei Überschreitung der 120-MP- oder 4×-Grenze die höchste mögliche PPI nennen und per Klick übernehmen.
+- Detailvergleich: 100-%-Ausschnitt des Ergebnisses als Interpolation und als Upscayl-Durchlauf (nur auf dem Ausschnitt, daher schnell). Kein Ersatz für einen Probedruck.
 - Bei Vergrößerung genau ein 4×-Upscayl-Durchlauf, anschließend Lanczos auf exakte Zielpixel. Ohne Vergrößerung kein KI-Aufruf.
 - ICC-Eingaben nach sRGB konvertieren; Transparenz auf Weiß; frische Ausgabe ohne EXIF/GPS, eingebettetes sRGB. CMYK ohne gültiges Profil ablehnen.
 - PNG und TIFF verlustfrei, JPEG mit Qualität 95 und ohne Farbunterabtastung.

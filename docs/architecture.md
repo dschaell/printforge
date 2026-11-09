@@ -11,7 +11,7 @@ Infrastructure implementiert die Ports `ImageProcessor` und `Upscaler`; nur der 
 
 - **Presentation:** lokale statische Oberfläche, HTTP-Validierung, Uploadstream, Fehlervertrag, temporärer Request-Lebenszyklus und Single-User-Zugangsschutz.
 - **Application:** Analyse-/Export-Use-Cases; Koordination der Ports, Entscheidung über KI-Verarbeitung und Größenlimits.
-- **Domain:** Zentimeter → Zielpixel, PPI, Skalierungsfaktor, Beschnitt und Warnungen. Keine I/O.
+- **Domain:** Zentimeter → Zielpixel, PPI, Skalierungsfaktor, Anschnitt, Zuschnitt, Qualitätsstufe und Warnungen. Keine I/O.
 - **Infrastructure:** Pillow für Dekodierung/Farbmanagement/Export; Upscayl als CLI-Prozess ohne Shell.
 
 N-Tier bezeichnet hier logische Schichten; Browser und Server sind die zwei physischen Tiers. Microservices, DB und Redis sind im lokalen MVP nicht notwendig. Die Request-Verarbeitung läuft synchron in einem Threadpool; das API nimmt keine zweite Verarbeitung an. Zukunft: persistente Jobzustände und separat begrenzter GPU-Worker hinter einem Queue-Port, ohne Druckgeometrie zu verändern.

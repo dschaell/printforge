@@ -14,8 +14,8 @@ from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from printforge.application.service import analyze, render
-from printforge.domain.planning import PRESETS, PrintError, PrintSpec
+from printforge.application.service import analyze, render, sample
+from printforge.domain.planning import MAX_BLEED_MM, PRESETS, PrintError, PrintSpec
 from printforge.infrastructure.images import PillowImages
 from printforge.infrastructure.upscayl import Upscayl
 
@@ -66,7 +66,10 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(PrintError)
     async def print_error(request: Request, exc: PrintError) -> JSONResponse:
-        return JSONResponse({"detail": str(exc)}, status_code=422)
+        body: dict[str, object] = {"detail": str(exc)}
+        if exc.suggested_ppi is not None:
+            body["suggested_ppi"] = exc.suggested_ppi
+        return JSONResponse(body, status_code=422)
 
     @app.get("/api/health")
     def health() -> dict[str, object]:
@@ -76,19 +79,22 @@ def create_app() -> FastAPI:
             "presets": PRESETS,
             "max_upload_mb": 40,
             "max_input_megapixels": 30,
+            "max_bleed_mm": MAX_BLEED_MM,
         }
 
     @app.post("/api/{action}")
     async def process(
-        action: Literal["plan", "render"],
+        action: Literal["plan", "render", "sample"],
         request: Request,
         width_cm: Annotated[float, Query(ge=1, le=200)] = 21,
         height_cm: Annotated[float, Query(ge=1, le=200)] = 29.7,
         ppi: Annotated[int, Query(ge=72, le=600)] = 300,
         fit: Literal["contain", "cover"] = "contain",
         output_format: Literal["png", "jpeg", "tiff"] = "png",
+        bleed_mm: Annotated[float, Query(ge=0, le=MAX_BLEED_MM)] = 0,
+        method: Literal["plain", "ai"] = "plain",
     ) -> Response:
-        spec = PrintSpec(width_cm, height_cm, ppi, fit)
+        spec = PrintSpec(width_cm, height_cm, ppi, fit, bleed_mm)
         if request.headers.get("content-type", "").split(";")[0] != "application/octet-stream":
             raise HTTPException(415, "Bild als application/octet-stream senden.")
         if app.state.gate.locked():
@@ -109,13 +115,19 @@ def create_app() -> FastAPI:
                 if action == "plan":
                     plan, info = await run_in_threadpool(analyze, source, spec, images)
                     return JSONResponse({"plan": plan.to_dict(), "image": info})
-                output = await run_in_threadpool(
-                    render, source, directory, spec, output_format, app.state.upscaler, images
-                )
+                if action == "sample":
+                    output = await run_in_threadpool(
+                        sample, source, directory, spec, method, app.state.upscaler, images
+                    )
+                else:
+                    output = await run_in_threadpool(
+                        render, source, directory, spec, output_format, app.state.upscaler, images
+                    )
+                kind = "png" if action == "sample" else output_format
                 response = FileResponse(
                     output,
-                    filename=f"printforge-{ppi}ppi.{output_format}",
-                    media_type=f"image/{output_format}",
+                    filename=f"printforge-{ppi}ppi.{kind}",
+                    media_type=f"image/{kind}",
                     background=BackgroundTask(work.cleanup),
                 )
                 handed_off = True

@@ -78,6 +78,36 @@ h1 em {
   gap: 12px;
   flex-direction: column;
   cursor: pointer;
+  padding: 18px;
+  border: 2px dashed #a3b09a;
+  border-radius: 12px;
+  transition: background 0.15s;
+}
+.upload:hover,
+.upload.over {
+  background: #dfe4d4;
+  border-color: #536e4d;
+}
+.upload:focus-within {
+  outline: 3px solid #a9bc55;
+  outline-offset: 3px;
+}
+.upload .filename {
+  font-size: 13px;
+  color: #365b36;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 .upload strong {
   font-size: 23px;
@@ -88,10 +118,6 @@ h1 em {
 .pick {
   border-bottom: 1px solid #86947c;
   width: fit-content;
-}
-input[type="file"] {
-  max-width: 100%;
-  font-size: 12px;
 }
 #paper {
   aspect-ratio: 210/297;
@@ -194,6 +220,65 @@ ul {
   font-size: 12px;
   color: #756031;
 }
+.quality {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  margin: 16px 0 0;
+  font-size: 13px;
+}
+.quality strong {
+  padding: 3px 10px;
+  border-radius: 99px;
+  color: #fff;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.quality[data-level="gut"] strong {
+  background: #2f6b3a;
+}
+.quality[data-level="ausreichend"] strong {
+  background: #5d7a2a;
+}
+.quality[data-level="grenzwertig"] strong {
+  background: #8a6212;
+}
+.quality[data-level="kritisch"] strong {
+  background: #a3342b;
+}
+#suggest,
+#compare {
+  margin-top: 16px;
+  width: 100%;
+}
+#compare-out {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 12px;
+}
+#compare-out figure {
+  margin: 0;
+  min-width: 0;
+}
+#compare-out img {
+  width: 100%;
+  display: block;
+  border-radius: 6px;
+  border: 1px solid #ccd3c6;
+  background: #fff;
+}
+#compare-out figcaption {
+  font-size: 12px;
+  color: #475d4b;
+  margin-top: 4px;
+}
+#compare-out p {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: #756031;
+  margin: 0;
+}
 .fine {
   font-size: 11px;
   color: #6c7669;
@@ -231,5 +316,8 @@ select:focus-visible {
   }
   #paper {
     width: 55%;
+  }
+  #compare-out {
+    grid-template-columns: 1fr;
   }
 }

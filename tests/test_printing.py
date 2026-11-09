@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from printforge.application.service import render
+from printforge.application.service import render, sample
 from printforge.domain.planning import PrintError, PrintSpec, plan_print
 from printforge.infrastructure.images import PillowImages, inspect_image
 from printforge.presentation.api import create_app
@@ -276,3 +276,174 @@ def test_temp_files_removed_after_analysis_and_download(client, monkeypatch):
         )
         assert response.status_code == 200
         assert not directories[-1].exists()
+
+
+# --- UX review 2026-11-09 (#10, #12, #13, #15, #16) ---
+
+
+def test_max_ppi_stays_within_pixel_budget():
+    from printforge.domain.planning import MAX_PIXELS, max_ppi
+
+    ppi = max_ppi(84.1, 118.9)
+    spec = PrintSpec(84.1, 118.9, ppi)
+    assert spec.width_px * spec.height_px <= MAX_PIXELS
+    assert ppi < 300
+    with pytest.raises(PrintError):
+        PrintSpec(84.1, 118.9, ppi + 1)
+    assert max_ppi(10, 10) == 600
+
+
+def test_limit_error_names_concrete_ppi(client):
+    response = client.post(
+        "/api/plan?width_cm=84.1&height_cm=118.9&ppi=300",
+        content=picture(),
+        headers={"content-type": "application/octet-stream"},
+    )
+    assert response.status_code == 422
+    body = response.json()
+    assert f"höchstens {body['suggested_ppi']} PPI" in body["detail"]
+    assert 72 <= body["suggested_ppi"] < 300
+
+
+def test_plan_suggests_ppi_when_more_than_4x_needed():
+    plan = plan_print(100, 100, PrintSpec(10, 10, 300))
+    assert plan.required_scale > 4
+    assert plan.suggested_ppi is not None
+    again = plan_print(100, 100, PrintSpec(10, 10, plan.suggested_ppi))
+    assert again.required_scale <= 4
+    assert plan_print(1000, 1000, PrintSpec(10, 10, 300)).suggested_ppi is None
+
+
+@pytest.mark.parametrize(
+    "source_ppi,rating",
+    [(300, "gut"), (150, "ausreichend"), (100, "grenzwertig"), (60, "kritisch")],
+)
+def test_quality_rating(source_ppi, rating):
+    from printforge.domain.planning import rate_quality
+
+    assert rate_quality(source_ppi) == rating
+    plan = plan_print(1000, 1000, PrintSpec(2.54, 2.54, 100))
+    assert plan.quality == "gut"
+    assert plan.quality_text
+
+
+def test_presets_sorted_small_to_large_and_unique():
+    from printforge.domain.planning import PRESETS
+
+    a_series = [name for name in PRESETS if name.startswith("A")]
+    assert a_series == ["A6", "A5", "A4", "A3", "A2", "A1", "A0"]
+    areas = [PRESETS[name][0] * PRESETS[name][1] for name in a_series]
+    assert areas == sorted(areas)
+    assert {"30×40", "50×70", "B2"} <= set(PRESETS)
+
+
+def test_health_serves_presets_for_the_ui(client):
+    data = client.get("/api/health").json()
+    assert data["presets"]["A4"] == [21.0, 29.7]
+    assert list(data["presets"])[0] == "A6"
+
+
+def test_bleed_adds_pixels_and_keeps_white_margin_for_contain(client):
+    # 2.54 cm trim + 2 x 10 mm bleed at 100 PPI
+    response = client.post(
+        "/api/render?width_cm=2.54&height_cm=2.54&ppi=100&bleed_mm=10",
+        content=picture((100, 100)),
+        headers={"content-type": "application/octet-stream"},
+    )
+    assert response.status_code == 200
+    with Image.open(io.BytesIO(response.content)) as image:
+        # 2.54 + 2.0 cm = 4.54 cm -> ceil(178.7) = 179 px
+        assert image.size == (179, 179)
+        rgb = image.convert("RGB")
+        assert rgb.getpixel((2, 2)) == (255, 255, 255)  # bleed stays white
+        assert rgb.getpixel((89, 89))[1] < 10  # image in the middle
+
+
+def test_bleed_filled_by_cover_and_validated(client):
+    response = client.post(
+        "/api/render?width_cm=2.54&height_cm=2.54&ppi=100&bleed_mm=10&fit=cover",
+        content=picture((100, 100)),
+        headers={"content-type": "application/octet-stream"},
+    )
+    with Image.open(io.BytesIO(response.content)) as image:
+        assert image.convert("RGB").getpixel((2, 2))[1] < 10  # red reaches the edge
+    too_much = client.post(
+        "/api/plan?bleed_mm=11",
+        content=picture(),
+        headers={"content-type": "application/octet-stream"},
+    )
+    assert too_much.status_code == 422
+
+
+def test_bleed_counts_towards_pixel_limit():
+    with pytest.raises(PrintError, match="höchstens"):
+        PrintSpec(100, 100, 300, "contain", 10)
+
+
+def test_sample_window_is_centered_and_inside_printed_area():
+    from printforge.domain.planning import sample_window
+
+    spec = PrintSpec(2.54, 2.54, 100)
+    box, size = sample_window(1000, 500, spec, 2.0)
+    assert box[0] >= 0 and box[2] <= 1000 and box[1] >= 0 and box[3] <= 500
+    assert (box[0] + box[2]) / 2 == 500 and (box[1] + box[3]) / 2 == 250
+    assert size == (round((box[2] - box[0]) * 2), round((box[3] - box[1]) * 2))
+    # cover crops the left/right: the window must not reach into the cropped part
+    cover = PrintSpec(2.54, 2.54, 100, "cover")
+    plan = plan_print(1000, 500, cover)
+    box, _ = sample_window(1000, 500, cover, plan.required_scale)
+    assert box[2] - box[0] <= 500
+
+
+def test_sample_plain_and_ai_use_gpu_only_on_the_crop(tmp_path):
+    source = tmp_path / "input"
+    source.write_bytes(picture((300, 200)))
+    fake = FakeUpscaler()
+    spec = PrintSpec(2.54, 2.54, 200, "contain")  # 200 px target from 300x200 -> downscale
+    plain = sample(source, tmp_path, spec, "plain", fake, PillowImages())
+    assert fake.calls == 0 and plain.exists()
+    small = tmp_path / "small"
+    small.write_bytes(picture((100, 100)))
+    spec = PrintSpec(2.54, 2.54, 200)
+    out = sample(small, tmp_path, spec, "ai", fake, PillowImages())
+    assert fake.calls == 1
+    with Image.open(out) as image:
+        assert image.size == (200, 200)
+    with pytest.raises(PrintError, match="Vergleichsmethode"):
+        sample(small, tmp_path, spec, "x", fake, PillowImages())
+    with pytest.raises(PrintError, match="4×"):
+        sample(small, tmp_path, PrintSpec(10, 10, 300), "ai", fake, PillowImages())
+    assert fake.calls == 1
+
+
+def test_sample_endpoint_returns_cleaned_up_png(client, monkeypatch):
+    import tempfile
+
+    original = tempfile.TemporaryDirectory
+    directories = []
+
+    def tracked(*args, **kwargs):
+        result = original(*args, **kwargs)
+        directories.append(Path(result.name))
+        return result
+
+    monkeypatch.setattr(tempfile, "TemporaryDirectory", tracked)
+    response = client.post(
+        "/api/sample?width_cm=2.54&height_cm=2.54&ppi=100&method=plain",
+        content=picture((400, 200)),
+        headers={"content-type": "application/octet-stream"},
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"
+    assert response.headers["cache-control"] == "no-store"
+    with Image.open(io.BytesIO(response.content)) as image:
+        assert image.size[0] <= 900 and image.size[1] <= 600
+    assert not directories[-1].exists()
+    assert (
+        client.post(
+            "/api/sample?method=evil",
+            content=picture(),
+            headers={"content-type": "application/octet-stream"},
+        ).status_code
+        == 422
+    )
