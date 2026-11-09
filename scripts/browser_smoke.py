@@ -93,8 +93,9 @@ try:
             raise RuntimeError("Stale plan remained downloadable")
         expect(page.locator("#metrics")).to_be_hidden()
         # Limit exceeded: the UI offers a concrete PPI and applies it.
-        page.locator("#preset").select_option("A0")
-        page.locator("#ppi").select_option("600")  # A0 at 600 PPI exceeds the default budget
+        page.locator("#width").fill("200")
+        page.locator("#height").fill("200")
+        page.locator("#ppi").select_option("600")  # 200 x 200 cm at 600 PPI exceeds the budget
         page.locator("#analyze").click()
         expect(page.locator("#suggest")).to_be_visible()
         expect(page.locator("#status")).to_contain_text("höchstens")

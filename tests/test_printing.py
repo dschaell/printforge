@@ -232,9 +232,9 @@ def test_cli_timeout_is_safe_error(tmp_path, monkeypatch):
     adapter = Upscayl(binary, tmp_path, "test-4x")
 
     def timeout(*args, **kwargs):
-        assert kwargs["timeout"] == 600
+        assert kwargs["timeout"] == adapter.timeout == 1800
         assert "shell" not in kwargs
-        raise subprocess.TimeoutExpired("private-path", 600)
+        raise subprocess.TimeoutExpired("private-path", adapter.timeout)
 
     monkeypatch.setattr(subprocess, "run", timeout)
     with pytest.raises(PrintError, match="Zeitlimit"):
@@ -573,11 +573,11 @@ def test_limit_is_configurable_and_defaults_safely(client):
     from printforge.domain.planning import configured_max_pixels
 
     assert configured_max_pixels("600") == 600_000_000
-    assert configured_max_pixels("0.5") == 400_000_000  # implausibly small -> default
-    assert configured_max_pixels("999999") == 400_000_000
-    assert configured_max_pixels("abc") == 400_000_000
-    assert configured_max_pixels("nan") == 400_000_000
-    assert configured_max_pixels("") == 400_000_000
+    assert configured_max_pixels("0.5") == 800_000_000  # implausibly small -> default
+    assert configured_max_pixels("999999") == 800_000_000
+    assert configured_max_pixels("abc") == 800_000_000
+    assert configured_max_pixels("nan") == 800_000_000
+    assert configured_max_pixels("") == 800_000_000
 
 
 def test_a0_at_300_ppi_works_with_a_raised_limit(monkeypatch):
@@ -633,3 +633,13 @@ def test_blocked_intermediate_image_is_explained_with_a_way_out(monkeypatch):
     assert plan.suggested_ppi is not None
     fine = plan_print(5040, 7128, PrintSpec(42, 59.4, plan.suggested_ppi))
     assert fine.ai_passes == 0  # no AI pass needed at the suggested PPI
+
+
+def test_upscayl_timeout_is_configurable(monkeypatch):
+    from printforge.infrastructure.upscayl import Upscayl
+
+    monkeypatch.setenv("PRINTFORGE_UPSCAYL_TIMEOUT_S", "3600")
+    assert Upscayl.from_environment().timeout == 3600
+    for bad in ("0", "abc", "999999"):
+        monkeypatch.setenv("PRINTFORGE_UPSCAYL_TIMEOUT_S", bad)
+        assert Upscayl.from_environment().timeout == 1800

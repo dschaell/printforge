@@ -7,7 +7,7 @@ from typing import Literal
 
 Fit = Literal["contain", "cover"]
 Quality = Literal["gut", "ausreichend", "grenzwertig", "kritisch"]
-DEFAULT_MAX_MEGAPIXELS = 400
+DEFAULT_MAX_MEGAPIXELS = 800
 ENV_MAX_MEGAPIXELS = "PRINTFORGE_MAX_MEGAPIXELS"
 DEFAULT_MAX_INPUT_MEGAPIXELS = 100
 ENV_MAX_INPUT_MEGAPIXELS = "PRINTFORGE_MAX_INPUT_MEGAPIXELS"

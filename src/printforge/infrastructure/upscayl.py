@@ -6,11 +6,21 @@ from pathlib import Path
 from printforge.domain.planning import PrintError
 
 
+def _timeout_from_environment(default: int = 1800) -> int:
+    """PRINTFORGE_UPSCAYL_TIMEOUT_S in seconds (60-86400); invalid values use the default."""
+    try:
+        value = int(os.getenv("PRINTFORGE_UPSCAYL_TIMEOUT_S", default))
+    except ValueError:
+        return default
+    return value if 60 <= value <= 86400 else default
+
+
 @dataclass(frozen=True)
 class Upscayl:
     binary: Path
     models: Path
     model: str = "high-fidelity-4x"
+    timeout: int = 1800
 
     @classmethod
     def from_environment(cls) -> "Upscayl":
@@ -19,6 +29,7 @@ class Upscayl:
             Path(os.getenv("UPSCAYL_BIN", str(base / "bin/upscayl-bin"))),
             Path(os.getenv("UPSCAYL_MODELS", str(base / "models"))),
             os.getenv("UPSCAYL_MODEL", "high-fidelity-4x"),
+            _timeout_from_environment(),
         )
 
     @property
@@ -56,7 +67,7 @@ class Upscayl:
                     "png",
                 ],
                 check=True,
-                timeout=600,
+                timeout=self.timeout,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
