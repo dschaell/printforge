@@ -362,7 +362,7 @@ def test_bleed_adds_pixels_and_keeps_white_margin_for_contain(client):
 def test_bleed_filled_by_cover_and_validated(client):
     response = client.post(
         "/api/render?width_cm=2.54&height_cm=2.54&ppi=100&bleed_mm=10&fit=cover",
-        content=picture((100, 100)),
+        content=picture((400, 400)),  # downscale only: no Upscayl needed (CI has none)
         headers={"content-type": "application/octet-stream"},
     )
     with Image.open(io.BytesIO(response.content)) as image:
