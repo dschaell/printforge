@@ -93,7 +93,8 @@ def render(
     if plan.ai_passes:
         if plan.source_width * plan.source_height * 16 > MAX_PIXELS:
             raise PrintError(
-                "4×-Zwischenbild überschreitet 120 Megapixel. Kleineren Ausschnitt verwenden."
+                f"4×-Zwischenbild überschreitet {MAX_PIXELS // 1_000_000} Megapixel. "
+                "Kleineren Ausschnitt verwenden."
             )
         enlarged = work / "enlarged.png"
         upscaler.upscale(normalized, enlarged)

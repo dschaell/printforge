@@ -20,7 +20,7 @@ N-Tier bezeichnet hier logische Schichten; Browser und Server sind die zwei phys
 
 `target_px = ceil(cm / 2.54 × ppi)`. Rundung nach oben unterschreitet die Zielauflösung nicht. Contain verwendet den kleineren, Cover den größeren Achsenfaktor. `source_ppi = target_ppi / scale` berücksichtigt den Bildbereich nach gewählter Einpassung. Metadaten-PPI der Vorlage bestimmen nicht die tatsächlich verfügbaren Details.
 
-Ein 4×-KI-Pass nur bei `scale > 1`; anschließend exakte Geometrie durch Lanczos. Mehr als 4× wird blockiert. Maximal 120 MP auch für das Zwischenbild, damit eine scheinbar kleine Zielvergrößerung nicht unbemerkt ein riesiges 4×-Bild produziert. Kein automatisches Nachgenerieren. sRGB-Ausgabe statt unkontrollierter CMYK-Konvertierung. Keine Druckqualität aus PPI allein ableiten.
+Ein 4×-KI-Pass nur bei `scale > 1`; anschließend exakte Geometrie durch Lanczos. Mehr als 4× wird blockiert. Maximal `PRINTFORGE_MAX_MEGAPIXELS` (Standard 400) auch für das Zwischenbild, damit eine scheinbar kleine Zielvergrößerung nicht unbemerkt ein riesiges 4×-Bild produziert. Kein automatisches Nachgenerieren. sRGB-Ausgabe statt unkontrollierter CMYK-Konvertierung. Keine Druckqualität aus PPI allein ableiten.
 
 ## 4. Qualität als Pipeline
 

@@ -15,7 +15,7 @@ from starlette.middleware.base import RequestResponseEndpoint
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from printforge.application.service import analyze, render, sample
-from printforge.domain.planning import MAX_BLEED_MM, PRESETS, PrintError, PrintSpec
+from printforge.domain.planning import MAX_BLEED_MM, MAX_PIXELS, PRESETS, PrintError, PrintSpec
 from printforge.infrastructure.images import PillowImages
 from printforge.infrastructure.upscayl import Upscayl
 
@@ -80,6 +80,7 @@ def create_app() -> FastAPI:
             "max_upload_mb": 40,
             "max_input_megapixels": 30,
             "max_bleed_mm": MAX_BLEED_MM,
+            "max_output_megapixels": MAX_PIXELS // 1_000_000,
         }
 
     @app.post("/api/{action}")

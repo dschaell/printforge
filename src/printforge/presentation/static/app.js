@@ -255,7 +255,8 @@ $("settings").addEventListener("submit", async (event) => {
       plan.required_scale <= 4 &&
       (!plan.ai_passes ||
         (health?.upscayl_available &&
-          plan.source_width * plan.source_height * 16 <= 120000000));
+          plan.source_width * plan.source_height * 16 <=
+            (health?.max_output_megapixels ?? 120) * 1000000));
     status(
       allowed
         ? "Berechnung fertig. Druckdatei kann erstellt werden."
@@ -355,6 +356,7 @@ fetch("/api/health")
   .then((r) => r.json())
   .then((data) => {
     health = data;
+    $("limit").textContent = data.max_output_megapixels;
     fillPresets(data.presets);
     $("engine").textContent = data.upscayl_available
       ? "● Upscayl verbunden"

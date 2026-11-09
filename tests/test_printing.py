@@ -18,6 +18,16 @@ def picture(size=(400, 200), fmt="PNG", **kwargs):
     return data.getvalue()
 
 
+@pytest.fixture(autouse=True)
+def pinned_limit(monkeypatch):
+    """Geometry tests assume 120 MP regardless of the configurable default."""
+    import printforge.application.service as service
+    import printforge.domain.planning as planning
+
+    for module in (planning, service):
+        monkeypatch.setattr(module, "MAX_PIXELS", 120_000_000)
+
+
 @pytest.fixture
 def client():
     with TestClient(create_app()) as instance:
@@ -555,3 +565,28 @@ def test_sample_with_trim_stays_inside_content(tmp_path):
         assert all(
             rgb.getpixel((x, y))[1] < 10 for x in (0, rgb.width - 1) for y in (0, rgb.height - 1)
         )
+
+
+def test_limit_is_configurable_and_defaults_safely(client):
+    from printforge.domain.planning import configured_max_pixels
+
+    assert configured_max_pixels("600") == 600_000_000
+    assert configured_max_pixels("0.5") == 400_000_000  # implausibly small -> default
+    assert configured_max_pixels("999999") == 400_000_000
+    assert configured_max_pixels("abc") == 400_000_000
+    assert configured_max_pixels("nan") == 400_000_000
+    assert configured_max_pixels("") == 400_000_000
+
+
+def test_a0_at_300_ppi_works_with_a_raised_limit(monkeypatch):
+    import printforge.domain.planning as planning
+
+    with pytest.raises(PrintError, match="120 Megapixeln"):
+        PrintSpec(84.1, 118.9, 300)
+    monkeypatch.setattr(planning, "MAX_PIXELS", 400_000_000)
+    spec = PrintSpec(84.1, 118.9, 300)
+    assert spec.width_px * spec.height_px > 120_000_000
+
+
+def test_health_reports_the_limit(client):
+    assert client.get("/api/health").json()["max_output_megapixels"] >= 1

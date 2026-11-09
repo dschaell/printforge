@@ -1,12 +1,29 @@
 """Pure print geometry. No framework, image library or filesystem dependencies."""
 
+import os
 from dataclasses import asdict, dataclass
 from math import ceil, isfinite
 from typing import Literal
 
 Fit = Literal["contain", "cover"]
 Quality = Literal["gut", "ausreichend", "grenzwertig", "kritisch"]
-MAX_PIXELS = 120_000_000
+DEFAULT_MAX_MEGAPIXELS = 400
+ENV_MAX_MEGAPIXELS = "PRINTFORGE_MAX_MEGAPIXELS"
+
+
+def configured_max_pixels(raw: str | None = None) -> int:
+    """Output pixel budget in pixels; invalid or implausible values fall back to the default."""
+    text = os.environ.get(ENV_MAX_MEGAPIXELS) if raw is None else raw
+    try:
+        megapixels = float(text) if text else DEFAULT_MAX_MEGAPIXELS
+    except ValueError:
+        megapixels = DEFAULT_MAX_MEGAPIXELS
+    if not isfinite(megapixels) or not 1 <= megapixels <= 2000:
+        megapixels = DEFAULT_MAX_MEGAPIXELS
+    return int(megapixels * 1_000_000)
+
+
+MAX_PIXELS = configured_max_pixels()
 MIN_PPI = 72
 MAX_PPI = 600
 MAX_BLEED_MM = 10.0
@@ -75,7 +92,7 @@ class PrintSpec:
         if self.width_px * self.height_px > MAX_PIXELS:
             possible = max_ppi(self.width_cm, self.height_cm, self.bleed_mm)
             raise PrintError(
-                "Ausgabe überschreitet das Limit von 120 Megapixeln. "
+                f"Ausgabe überschreitet das Limit von {MAX_PIXELS // 1_000_000} Megapixeln. "
                 f"Bei diesem Maß sind höchstens {possible} PPI möglich.",
                 suggested_ppi=possible,
             )
