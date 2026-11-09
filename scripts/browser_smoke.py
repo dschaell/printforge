@@ -119,6 +119,7 @@ try:
         expect(page.locator("#fitpaper")).to_be_hidden()
         if not 14.8 <= float(page.locator("#height").input_value()) <= 14.9:
             raise RuntimeError("Paper was not fitted to the trimmed image")
+        expect(page.locator("#analyze")).to_be_enabled()  # re-analysis finished
         # Drag and drop loads the file like the picker does.
         page.locator("#drop").dispatch_event(
             "drop",
