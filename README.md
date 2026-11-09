@@ -25,9 +25,13 @@ Binary muss ausführbar sein. Modellname ohne `.bin`/`.param`. Auf Windows Power
 ## Was die erste Version kann
 
 - JPEG/PNG/WebP/TIFF anhand tatsächlicher Datei dekodieren, EXIF-Ausrichtung berücksichtigen.
-- A0–A5, Hoch-/Querformat oder freie Maße 1–200 cm, 72–600 PPI.
-- Ganze Bilder mit weißen Rändern oder mittiger Beschnitt; Vorschau im Browser (TIFF browserabhängig).
-- Original-PPI am gewählten Druckmaß, erforderlicher Faktor und Beschnittfläche anzeigen.
+- A6–A0, B1–B4, Poster-Standards (30×40 bis 70×100) oder freie Maße 1–200 cm, 72–600 PPI. Papier dreht sich automatisch passend zum Bild; ⇄ dreht zurück.
+- „Weiße Ränder entfernen“ schneidet fast-weiße Kanten vor dem Skalieren ab (Transparenz zählt als Weiß). Danach schlägt die Analyse das größte Papiermaß mit Bildseitenverhältnis innerhalb des gewählten Formats vor, ohne Zoom und ohne neue Ränder.
+- Optionaler Druckerei-Anschnitt 0–10 mm je Seite. „Fläche füllen“ läuft in den Anschnitt, „Ganzes Bild“ lässt ihn weiß.
+- Ganze Bilder mit weißen Rändern oder mittigem Zuschnitt; Vorschau im Browser (TIFF browserabhängig).
+- Original-PPI am gewählten Druckmaß, erforderlicher Faktor, abgeschnittener Bildanteil und eine Qualitätseinstufung (gut / ausreichend / grenzwertig / kritisch) anzeigen.
+- Bei Überschreitung der Megapixel- oder 4×-Grenze die höchste mögliche PPI nennen und per Klick übernehmen.
+- Detailvergleich: 100-%-Ausschnitt des Ergebnisses als Interpolation und als Upscayl-Durchlauf (nur auf dem Ausschnitt, daher schnell). Kein Ersatz für einen Probedruck.
 - Bei Vergrößerung genau ein 4×-Upscayl-Durchlauf, anschließend Lanczos auf exakte Zielpixel. Ohne Vergrößerung kein KI-Aufruf.
 - ICC-Eingaben nach sRGB konvertieren; Transparenz auf Weiß; frische Ausgabe ohne EXIF/GPS, eingebettetes sRGB. CMYK ohne gültiges Profil ablehnen.
 - PNG und TIFF verlustfrei, JPEG mit Qualität 95 und ohne Farbunterabtastung.
@@ -36,7 +40,7 @@ Binary muss ausführbar sein. Modellname ohne `.bin`/`.param`. Auf Windows Power
 
 ## Betrieb und Grenzen
 
-Single-User-MVP auf Loopback, **nicht öffentlich exponieren**. Ein Vorgang gleichzeitig, sonst HTTP 429; kein persistenter Jobserver. 40 MiB Upload, 30 MP Eingang, 120 MP Ziel und 4×-Zwischenbild, 600 Sekunden Upscayl-Timeout. Das kann A0 bei 300 PPI oder große 4×-Zwischenbilder blockieren; dann PPI/Maße reduzieren. Kein stiller Wechsel auf reine Interpolation bei fehlendem Upscayl. Konfigurierte Modelle müssen tatsächlich 4× liefern; Abmessungen werden geprüft.
+Single-User-MVP auf Loopback, **nicht öffentlich exponieren**. Ein Vorgang gleichzeitig, sonst HTTP 429; kein persistenter Jobserver. 100 MiB Upload, 100 MP Eingang, 800 MP Ziel und 4×-Zwischenbild (einstellbar, s. u.), 1800 Sekunden Upscayl-Timeout (`PRINTFORGE_UPSCAYL_TIMEOUT_S`, 60–86400). Das Limit ist auf lokalen Rechnern anhebbar: `export PRINTFORGE_MAX_MEGAPIXELS=1200` vor dem Start (1–2000, Standard 800). Entsprechend `PRINTFORGE_MAX_INPUT_MEGAPIXELS` (Standard 100) und `PRINTFORGE_MAX_UPLOAD_MIB` (Standard 100), je 1–1000. Ein dekodiertes Eingangsbild braucht grob 4–8 Byte pro Pixel. Rechne mit grob 10 Byte RAM pro Ausgabepixel (800 MP ≈ 8 GB Spitze, bei 64 GB Mac unkritisch); ein 4×-Zwischenbild belegt zusätzlich Speicher. Bei Überschreitung nennt die App die höchste mögliche PPI. Kein stiller Wechsel auf reine Interpolation bei fehlendem Upscayl. Konfigurierte Modelle müssen tatsächlich 4× liefern; Abmessungen werden geprüft.
 
 Temporärdateien werden nach Analyse/Fehler bzw. abgeschlossener Downloadantwort entfernt. Ein Prozessabbruch kann OS-Tempdateien hinterlassen; keine Garantie sicherer physischer Löschung. Bilder werden weder ins Repository geschrieben noch an externe Dienste geschickt. Der Browser lädt die Datei bei Analyse und Export jeweils an den lokalen Server. GPU-/RAM-Last kann erheblich sein; Pixelgrenzen ersetzen kein Betriebssystem-Ressourcenlimit.
 

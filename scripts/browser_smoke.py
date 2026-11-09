@@ -44,7 +44,20 @@ try:
         errors = []
         page.on("pageerror", lambda error: errors.append(str(error)))
         page.goto("http://127.0.0.1:8788")
+        expect(page.locator("#preset option")).not_to_have_count(1)
+        names = page.locator("#preset option").evaluate_all("o => o.map(x => x.value)")
+        if names[:3] != ["A6", "A5", "A4"] or "50×70" not in names or names[-1] != "custom":
+            raise RuntimeError(f"Presets wrong: {names}")
+        if page.request.get("http://127.0.0.1:8788/favicon.svg").status != 200:
+            raise RuntimeError("Favicon missing")
+        # The native file input is hidden, the drop zone shows the chosen file.
+        if page.locator("#file").evaluate("e => getComputedStyle(e).clipPath") == "none":
+            raise RuntimeError("Native file button is visible")
         page.locator("#file").set_input_files(str(image))
+        expect(page.locator("#filename")).to_contain_text("fixture.png")
+        # Landscape image on portrait A4: the paper turns automatically.
+        expect(page.locator("#width")).to_have_value("29.7")
+        expect(page.locator("#status")).to_contain_text("gedreht")
         page.locator("#width").fill("5.08")
         page.locator("#height").fill("5.08")
         page.locator("#ppi").select_option("150")
@@ -60,6 +73,11 @@ try:
             if result.size != (300, 300):
                 raise RuntimeError(f"Wrong download dimensions: {result.size}")
         expect(page.locator("#width")).to_be_enabled()
+        expect(page.locator("#quality")).to_contain_text("Qualität: gut")
+        expect(page.locator("#metrics")).to_contain_text("Bildanteil abgeschnitten")
+        page.locator("#compare").click()
+        expect(page.locator("#compare-out img")).to_have_count(1)
+        expect(page.locator("#compare-out")).to_contain_text("Keine Vergrößerung")
         if errors:
             raise RuntimeError(errors)
         screenshots = ROOT / "test-results"
@@ -74,8 +92,57 @@ try:
         if not page.locator("#download").is_disabled():
             raise RuntimeError("Stale plan remained downloadable")
         expect(page.locator("#metrics")).to_be_hidden()
+        # Limit exceeded: the UI offers a concrete PPI and applies it.
+        page.locator("#width").fill("200")
+        page.locator("#height").fill("200")
+        page.locator("#ppi").select_option("600")  # 200 x 200 cm at 600 PPI exceeds the budget
+        page.locator("#analyze").click()
+        expect(page.locator("#suggest")).to_be_visible()
+        expect(page.locator("#status")).to_contain_text("höchstens")
+        suggested = page.locator("#suggest").get_attribute("data-ppi")
+        page.locator("#suggest").click()
+        expect(page.locator("#metrics")).to_be_visible()
+        expect(page.locator("#ppi")).to_have_value(suggested)
+        # White bars are trimmed and the paper fits the trimmed image.
+        bars = Path(directory) / "bars.png"
+        framed = Image.new("RGB", (800, 600), "white")
+        framed.paste(Image.new("RGB", (800, 400), "#537251"), (0, 100))
+        framed.save(bars)
+        page.locator("#file").set_input_files(str(bars))
+        page.locator("#preset").select_option("A4")
+        page.locator("#trim").check()
+        page.locator("#ppi").select_option("100")
+        page.locator("#analyze").click()
+        expect(page.locator("#fitpaper")).to_be_visible()
+        expect(page.locator("#metrics")).to_contain_text("Nach Weißrand-Zuschnitt")
+        expect(page.locator("#metrics")).to_contain_text("800 × 400 px")
+        page.locator("#fitpaper").click()
+        expect(page.locator("#fitpaper")).to_be_hidden()
+        # Trimmed image is 800 x 400 px (2:1): the fitted paper must have that aspect.
+        fitted_w = float(page.locator("#width").input_value())
+        fitted_h = float(page.locator("#height").input_value())
+        if abs(fitted_w / fitted_h - 2) > 0.05:
+            raise RuntimeError(
+                f"Paper was not fitted to the trimmed image: {fitted_w} x {fitted_h}"
+            )
+        expect(page.locator("#analyze")).to_be_enabled()  # re-analysis finished
+        # Drag and drop loads the file like the picker does.
+        page.locator("#drop").dispatch_event(
+            "drop",
+            {
+                "dataTransfer": page.evaluate_handle(
+                    """() => { const t = new DataTransfer();
+              t.items.add(new File([new Uint8Array(4)], "dropped.png", {type: "image/png"}));
+              return t; }"""
+                )
+            },
+        )
+        expect(page.locator("#filename")).to_contain_text("dropped.png")
         browser.close()
-        print("Browser smoke passed: upload, analysis, 300×300 export, invalidation, mobile layout")
+        print(
+            "Browser smoke passed: upload, drop, rotation, presets, analysis, quality, "
+            "detail compare, PPI suggestion, 300×300 export, invalidation, mobile layout"
+        )
 finally:
     server.terminate()
     server.wait(timeout=10)

@@ -2,15 +2,16 @@ import warnings
 from pathlib import Path
 from typing import Any
 
-from PIL import Image, ImageCms, ImageOps, UnidentifiedImageError
+from PIL import Image, ImageChops, ImageCms, ImageOps, UnidentifiedImageError
 
-from printforge.domain.planning import MAX_PIXELS, PrintError, PrintSpec
+from printforge.domain.planning import MAX_INPUT_PIXELS, MAX_PIXELS, PrintError, PrintSpec
 
 Image.MAX_IMAGE_PIXELS = MAX_PIXELS
 ALLOWED = {"JPEG", "PNG", "WEBP", "TIFF"}
 
 
-def inspect_image(path: Path, max_pixels: int = 30_000_000) -> dict[str, Any]:
+def inspect_image(path: Path, max_pixels: int | None = None) -> dict[str, Any]:
+    max_pixels = MAX_INPUT_PIXELS if max_pixels is None else max_pixels
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("error", Image.DecompressionBombWarning)
@@ -74,9 +75,12 @@ def export_image(source: Path, destination: Path, spec: PrintSpec, fmt: str) -> 
     with Image.open(source) as image:
         size = (spec.width_px, spec.height_px)
         if spec.fit == "cover":
+            # The image fills the whole sheet including bleed.
             result = ImageOps.fit(image, size, method=Image.Resampling.LANCZOS)
         else:
-            fitted = ImageOps.contain(image, size, method=Image.Resampling.LANCZOS)
+            # The whole image sits in the trim box; the bleed stays white.
+            trim = (spec.trim_width_px, spec.trim_height_px)
+            fitted = ImageOps.contain(image, trim, method=Image.Resampling.LANCZOS)
             result = Image.new("RGB", size, "white")
             result.paste(fitted, ((size[0] - fitted.width) // 2, (size[1] - fitted.height) // 2))
         profile = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
@@ -88,7 +92,40 @@ def export_image(source: Path, destination: Path, spec: PrintSpec, fmt: str) -> 
         result.save(destination, format=fmt.upper(), **options)
 
 
+WHITE_TOLERANCE = 10  # per channel; absorbs JPEG noise and faint scanner tint
+
+
+def content_box(path: Path) -> tuple[int, int, int, int]:
+    """Bounding box of everything that is not (nearly) white; transparency counts as white."""
+    with Image.open(path) as opened:
+        rgba = ImageOps.exif_transpose(opened).convert("RGBA")
+    canvas = Image.new("RGBA", rgba.size, "white")
+    canvas.alpha_composite(rgba)
+    darkest = ImageChops.invert(canvas.convert("RGB"))
+    r, g, b = darkest.split()
+    mask = ImageChops.lighter(ImageChops.lighter(r, g), b).point(
+        lambda v: 255 if v > WHITE_TOLERANCE else 0
+    )
+    box = mask.getbbox()
+    if box is None:
+        raise PrintError("Das Bild besteht nur aus Weiß. Nichts zum Zuschneiden.")
+    return box
+
+
+def crop_image(source: Path, destination: Path, box: tuple[int, int, int, int]) -> None:
+    with Image.open(source) as image:
+        image.crop(box).save(destination, format="PNG")
+
+
+def resize_image(source: Path, destination: Path, size: tuple[int, int]) -> None:
+    with Image.open(source) as image:
+        image.resize(size, Image.Resampling.LANCZOS).save(destination, format="PNG")
+
+
 class PillowImages:
     inspect = staticmethod(inspect_image)
     normalize = staticmethod(normalize_image)
     export = staticmethod(export_image)
+    crop = staticmethod(crop_image)
+    content_box = staticmethod(content_box)
+    resize = staticmethod(resize_image)
