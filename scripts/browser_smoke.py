@@ -118,8 +118,13 @@ try:
         expect(page.locator("#metrics")).to_contain_text("800 × 400 px")
         page.locator("#fitpaper").click()
         expect(page.locator("#fitpaper")).to_be_hidden()
-        if not 14.8 <= float(page.locator("#height").input_value()) <= 14.9:
-            raise RuntimeError("Paper was not fitted to the trimmed image")
+        # Trimmed image is 800 x 400 px (2:1): the fitted paper must have that aspect.
+        fitted_w = float(page.locator("#width").input_value())
+        fitted_h = float(page.locator("#height").input_value())
+        if abs(fitted_w / fitted_h - 2) > 0.05:
+            raise RuntimeError(
+                f"Paper was not fitted to the trimmed image: {fitted_w} x {fitted_h}"
+            )
         expect(page.locator("#analyze")).to_be_enabled()  # re-analysis finished
         # Drag and drop loads the file like the picker does.
         page.locator("#drop").dispatch_event(
